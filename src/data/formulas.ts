@@ -1,0 +1,43 @@
+export const IB_FORMULAS: Record<string, { title: string; latex: string }[]> = {
+  "Topic 1: Number and Algebra": [
+    { title: "Arithmetic Sequence", latex: "u_n = u_1 + (n-1)d" },
+    { title: "Arithmetic Series", latex: "S_n = \\frac{n}{2}(2u_1 + (n-1)d)" },
+    { title: "Geometric Sequence", latex: "u_n = u_1 r^{n-1}" },
+    { title: "Geometric Series", latex: "S_n = \\frac{u_1(r^n - 1)}{r - 1}" },
+    { title: "Infinite Geometric Series", latex: "S_\\infty = \\frac{u_1}{1-r}, |r|<1" },
+    { title: "Compound Interest", latex: "FV = PV \\times (1 + \\frac{r}{100k})^{kn}" },
+    { title: "Binomial Expansion", latex: "(a+b)^n = \\sum_{r=0}^n \\binom{n}{r} a^{n-r} b^r" },
+  ],
+  "Topic 2: Functions": [
+    { title: "Quadratic Function", latex: "f(x) = ax^2 + bx + c" },
+    { title: "Axis of Symmetry", latex: "x = -\\frac{b}{2a}" },
+    { title: "Discriminant", latex: "\\Delta = b^2 - 4ac" },
+    { title: "Logarithm Change of Base", latex: "\\log_a x = \\frac{\\log_b x}{\\log_b a}" },
+  ],
+  "Topic 3: Geometry and Trigonometry": [
+    { title: "Distance Formula", latex: "d = \\sqrt{(x_2-x_1)^2 + (y_2-y_1)^2}" },
+    { title: "Midpoint", latex: "M = (\\frac{x_1+x_2}{2}, \\frac{y_1+y_2}{2})" },
+    { title: "Sine Rule", latex: "\\frac{a}{\\sin A} = \\frac{b}{\\sin B} = \\frac{c}{\\sin C}" },
+    { title: "Cosine Rule", latex: "c^2 = a^2 + b^2 - 2ab \\cos C" },
+    { title: "Area of Triangle", latex: "A = \\frac{1}{2}ab \\sin C" },
+    { title: "Double Angle: sin(2A)", latex: "\\sin 2A = 2\\sin A \\cos A" },
+    { title: "Double Angle: cos(2A)", latex: "\\cos 2A = \\cos^2 A - \\sin^2 A" },
+  ],
+  "Topic 4: Statistics and Probability": [
+    { title: "Mean", latex: "\\bar{x} = \\frac{\\sum f_i x_i}{n}" },
+    { title: "Variance", latex: "\\sigma^2 = \\frac{\\sum f_i (x_i - \\mu)^2}{n}" },
+    { title: "Probability P(A)", latex: "P(A) = \\frac{n(A)}{n(U)}" },
+    { title: "Conditional Probability", latex: "P(A|B) = \\frac{P(A \\cap B)}{P(B)}" },
+    { title: "Binomial Distribution", latex: "P(X=x) = \\binom{n}{x} p^x (1-p)^{n-x}" },
+    { title: "Standard Normal", latex: "z = \\frac{x - \\mu}{\\sigma}" },
+  ],
+  "Topic 5: Calculus": [
+    { title: "Derivative Power Rule", latex: "f(x) = x^n \\Rightarrow f'(x) = nx^{n-1}" },
+    { title: "Chain Rule", latex: "y = g(u), u = f(x) \\Rightarrow \\frac{dy}{dx} = \\frac{dy}{du} \\times \\frac{du}{dx}" },
+    { title: "Product Rule", latex: "y = uv \\Rightarrow y' = uv' + vu'" },
+    { title: "Quotient Rule", latex: "y = \\frac{u}{v} \\Rightarrow y' = \\frac{vu' - uv'}{v^2}" },
+    { title: "Integration Power Rule", latex: "\\int x^n dx = \\frac{x^{n+1}}{n+1} + C" },
+    { title: "Definite Integral", latex: "\\int_a^b f(x) dx = F(b) - F(a)" },
+    { title: "Kinematics", latex: "v = \\frac{ds}{dt}, a = \\frac{dv}{dt}" },
+  ],
+};

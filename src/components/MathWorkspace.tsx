@@ -384,13 +384,14 @@ export default function MathWorkspace({ initialCourse = "IB" }: { initialCourse?
 
           <div className="flex items-center gap-3">
             {/* Streak Badge */}
-            <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-bold text-xs shadow-sm relative group cursor-help transition-colors ${
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-bold text-xs shadow-sm relative group cursor-help transition-colors ${
               streak > 0 
                 ? "bg-orange-50 text-orange-600 border-orange-100" 
                 : "bg-slate-100 text-slate-500 border-slate-200"
             }`}>
               <span className={`text-sm ${streak > 0 ? "animate-pulse" : "grayscale opacity-50"}`}>🔥</span> 
-              {streak > 0 ? `${streak} Day${streak !== 1 ? 's' : ''}` : "Start Streak"}
+              <span className="hidden sm:inline">{streak > 0 ? `${streak} Day${streak !== 1 ? 's' : ''}` : "Start Streak"}</span>
+              <span className="sm:hidden">{streak}</span>
               
               {/* Tooltip */}
               <div className="absolute top-full mt-2 right-0 w-48 p-3 bg-slate-800 text-white text-[10px] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl leading-relaxed text-center">
@@ -403,10 +404,10 @@ export default function MathWorkspace({ initialCourse = "IB" }: { initialCourse?
 
             <button 
               onClick={() => setShowFormulas(true)}
-
-              className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-all border border-slate-200"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-all border border-slate-200"
+              title="Formulas"
             >
-              <Book size={16} /> Formulas
+              <Book size={16} /> <span className="hidden sm:inline">Formulas</span>
             </button>
             <button 
               onClick={recommendTopic}

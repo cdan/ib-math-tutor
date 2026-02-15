@@ -6,7 +6,7 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
 export async function POST(req: Request) {
   try {
-    const { question, userAnswer, topic, questionId, userId, forceIncorrect } = await req.json();
+    const { question, userAnswer, topic, questionId, userId, course = "IB", forceIncorrect } = await req.json();
 
     let status = "incorrect";
     let feedback = "";
@@ -77,6 +77,7 @@ export async function POST(req: Request) {
         .select('*')
         .eq('user_id', userId)
         .eq('topic', topic)
+        .eq('course', course)
         .single();
       
       if (fetchError && fetchError.code !== 'PGRST116') { // Ignore "no rows" error
@@ -89,10 +90,11 @@ export async function POST(req: Request) {
       const { error: upsertError } = await supabaseAdmin.from('user_mastery').upsert({
         user_id: userId,
         topic: topic,
+        course: course,
         correct_count: newCorrect,
         total_attempts: newTotal,
         last_practiced_at: new Date().toISOString()
-      });
+      }, { onConflict: 'user_id, topic, course' });
 
       if (upsertError) console.error("Mastery Upsert Error:", upsertError);
     } else {

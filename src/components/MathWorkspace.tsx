@@ -139,6 +139,7 @@ export default function MathWorkspace({ initialCourse = "IB" }: { initialCourse?
           userAnswer: userAnswer,
           questionId: question.id,
           userId: userId,
+          course: course, // Add course context
         }),
       });
       
@@ -197,6 +198,7 @@ export default function MathWorkspace({ initialCourse = "IB" }: { initialCourse?
           userAnswer: userAnswer || "(Surrendered)",
           questionId: question.id,
           userId: userId,
+          course: course,
           forceIncorrect: true // Flag to mark as incorrect without AI grading
         }),
       });

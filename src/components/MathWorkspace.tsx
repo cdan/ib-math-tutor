@@ -227,22 +227,41 @@ export default function MathWorkspace() {
   };
 
   const recommendTopic = () => {
-
-    let worstTopic = "";
     let minScore = 101;
     const allSubtopics = IB_SL_AA_SYLLABUS.flatMap(t => t.subtopics);
+    const candidateTopics: string[] = [];
+
+    // 1. Calculate scores and find minimum
     for (const sub of allSubtopics) {
       const stats = mastery[sub.title];
+      let score = 0;
       if (stats && stats.total > 0) {
-        const score = (stats.correct / stats.total) * 100;
-        if (score < minScore) {
-          minScore = score;
-          worstTopic = sub.title;
-        }
+        score = (stats.correct / stats.total) * 100;
+      } else {
+        score = 0; // Unattempted topics have 0 score
+      }
+
+      if (score < minScore) {
+        minScore = score;
+        candidateTopics.length = 0; // Reset candidates
+        candidateTopics.push(sub.title);
+      } else if (score === minScore) {
+        candidateTopics.push(sub.title);
       }
     }
-    if (!worstTopic) worstTopic = allSubtopics[0].title;
-    generateQuestion(worstTopic);
+
+    // 2. Pick random topic from the candidates with the lowest score
+    // This prevents always picking the first topic when starting out (all 0%)
+    let selectedTopic = "";
+    if (candidateTopics.length > 0) {
+      const randomIndex = Math.floor(Math.random() * candidateTopics.length);
+      selectedTopic = candidateTopics[randomIndex];
+    } else {
+        // Fallback (should rarely happen)
+        selectedTopic = allSubtopics[0].title;
+    }
+
+    generateQuestion(selectedTopic);
   };
 
   const getParentTopic = (subTitle: string) => {

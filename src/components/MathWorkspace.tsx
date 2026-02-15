@@ -65,16 +65,20 @@ export default function MathWorkspace() {
   }, [userId]);
 
 
-  const getMasteryLevel = (topicTitle: string) => {
+  const getMasteryBadge = (topicTitle: string) => {
     const stats = mastery[topicTitle];
-    if (!stats || stats.total === 0) return "⚪";
+    if (!stats || stats.total === 0) return { icon: "⚪", label: "Unexplored", class: "text-slate-300" };
+    
     const rate = (stats.correct / stats.total) * 100;
-    if (rate >= 70) return "🟢";
-    if (rate >= 40) return "🟡";
-    return "🔴";
+    
+    if (stats.correct >= 50 && rate >= 90) return { icon: "🥇", label: "Master", class: "text-yellow-500" };
+    if (stats.correct >= 20 && rate >= 80) return { icon: "🥈", label: "Pro", class: "text-slate-400" };
+    if (stats.correct >= 5) return { icon: "🥉", label: "Novice", class: "text-amber-600" };
+    return { icon: "🌱", label: "Beginner", class: "text-emerald-500" };
   };
 
   const generateQuestion = async (topicOverride?: string) => {
+
     const topicToUse = topicOverride || selectedTopic;
     if (!topicToUse) {
       alert("Please select a topic first!");
@@ -285,8 +289,40 @@ export default function MathWorkspace() {
   const accuracy = history.length > 0 ? Math.round((stats.totalCorrect / history.length) * 100) : 0;
   const mathScore = 1000 + (stats.totalCorrect * 50) + (history.length * 10);
 
+  // Badge Counts
+  const badgeCounts = { master: 0, pro: 0, novice: 0 };
+  IB_SL_AA_SYLLABUS.forEach(t => t.subtopics.forEach(sub => {
+    const badge = getMasteryBadge(sub.title);
+    if (badge.label === "Master") badgeCounts.master++;
+    if (badge.label === "Pro") badgeCounts.pro++;
+    if (badge.label === "Novice") badgeCounts.novice++;
+  }));
+
+  // Calculate Streak
+
+  const getStreak = () => {
+    if (history.length === 0) return 0;
+    const dates = Array.from(new Set(history.map(h => new Date(h.timestamp).toISOString().split("T")[0]))).sort().reverse();
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    
+    if (dates[0] !== today && dates[0] !== yesterday) return 0;
+    
+    let streak = 1;
+    for (let i = 0; i < dates.length - 1; i++) {
+      const d1 = new Date(dates[i]);
+      const d2 = new Date(dates[i+1]);
+      const diff = (d1.getTime() - d2.getTime()) / (1000 * 3600 * 24);
+      if (Math.round(diff) === 1) streak++;
+      else break;
+    }
+    return streak;
+  };
+  const streak = getStreak();
+
   return (
     <div className="flex min-h-screen w-full bg-slate-50 justify-center font-sans">
+
       
       {/* Formula Slide-over */}
       {showFormulas && (
@@ -331,8 +367,29 @@ export default function MathWorkspace() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Streak Badge */}
+            <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-bold text-xs shadow-sm relative group cursor-help transition-colors ${
+              streak > 0 
+                ? "bg-orange-50 text-orange-600 border-orange-100" 
+                : "bg-slate-100 text-slate-500 border-slate-200"
+            }`}>
+              <span className={`text-sm ${streak > 0 ? "animate-pulse" : "grayscale opacity-50"}`}>🔥</span> 
+              {streak > 0 ? `${streak} Day${streak !== 1 ? 's' : ''}` : "Start Streak"}
+              
+              {/* Tooltip */}
+              <div className="absolute top-full mt-2 right-0 w-48 p-3 bg-slate-800 text-white text-[10px] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl leading-relaxed text-center">
+                {streak > 0 
+                  ? "Great job! Practice daily to keep the fire burning!" 
+                  : "Solve a question today to light the fire!"}
+                <div className="absolute -top-1 right-6 w-2 h-2 bg-slate-800 rotate-45"></div>
+              </div>
+            </div>
+
+
+
             <button 
               onClick={() => setShowFormulas(true)}
+
               className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-all border border-slate-200"
             >
               <Book size={16} /> Formulas
@@ -356,9 +413,10 @@ export default function MathWorkspace() {
         </header>
 
         {/* Stats Dashboard */}
-        <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 grid grid-cols-3 gap-4">
+        <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">This Week</p>
+
             <div className="flex items-center gap-2 text-indigo-600">
               <TrendingUp size={20} />
               <span className="text-2xl font-bold">{stats.weekCount}</span>
@@ -376,7 +434,34 @@ export default function MathWorkspace() {
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Badges</p>
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="relative group cursor-help flex items-center gap-1">
+                <span className="text-lg">🥇</span>{badgeCounts.master}
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 p-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                  Master<br/><span className="opacity-70">50+ solved &gt;90% acc</span>
+                </div>
+              </div>
+              <div className="relative group cursor-help flex items-center gap-1">
+                <span className="text-lg">🥈</span>{badgeCounts.pro}
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 p-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                  Pro<br/><span className="opacity-70">20+ solved &gt;80% acc</span>
+                </div>
+              </div>
+              <div className="relative group cursor-help flex items-center gap-1">
+                <span className="text-lg">🥉</span>{badgeCounts.novice}
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 p-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center shadow-lg">
+                  Novice<br/><span className="opacity-70">5+ solved</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">Collection</p>
+          </div>
+
+
+          <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Math Score</p>
+
             <div className="flex items-center gap-2 text-amber-500">
               <Trophy size={20} />
               <span className="text-2xl font-bold">{mathScore}</span>
@@ -395,14 +480,18 @@ export default function MathWorkspace() {
             <option value="">Select a Topic to Practice...</option>
             {IB_SL_AA_SYLLABUS.map((topic) => (
               <optgroup key={topic.id} label={topic.title}>
-                {topic.subtopics.map((sub) => (
-                  <option key={sub.id} value={sub.title}>
-                    {getMasteryLevel(sub.title)} {sub.id} {sub.title}
-                  </option>
-                ))}
+                {topic.subtopics.map((sub) => {
+                  const badge = getMasteryBadge(sub.title);
+                  return (
+                    <option key={sub.id} value={sub.title}>
+                      {badge.icon} [{badge.label}] {sub.id} {sub.title}
+                    </option>
+                  );
+                })}
               </optgroup>
             ))}
           </select>
+
         </div>
 
         {/* Content Area */}

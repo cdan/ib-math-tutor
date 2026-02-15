@@ -12,9 +12,11 @@ const INITIAL_QUESTION = {
   id: "",
   topic: "",
   text: "",
+  hint: "",
   answer: "",
   explanation: "",
 };
+
 
 type MasteryData = { [topicId: string]: { correct: number; total: number } };
 type HistoryItem = {
@@ -37,34 +39,31 @@ export default function MathWorkspace() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
+  const [showHint, setShowHint] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
-  const [userId, setUserId] = useState("");
+
+  const [userId] = useState("student"); // Fixed ID for single-user mode
   
   const [mastery, setMastery] = useState<MasteryData>({});
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
-    // User ID Init
-    let uid = localStorage.getItem("ib-math-user-id");
-    if (!uid) {
-      uid = crypto.randomUUID();
-      localStorage.setItem("ib-math-user-id", uid);
-    }
-    setUserId(uid);
+    // Fetch initial data from API for the fixed user
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(`/api/user-progress?userId=${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMastery(data.mastery || {});
+          setHistory(data.history || []);
+        }
+      } catch (err) {
+        console.error("Failed to load progress:", err);
+      }
+    };
+    fetchProgress();
+  }, [userId]);
 
-    const savedMastery = localStorage.getItem("ib-math-mastery");
-    if (savedMastery) setMastery(JSON.parse(savedMastery));
-    const savedHistory = localStorage.getItem("ib-math-history");
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
-  }, []);
-
-  useEffect(() => {
-    if (Object.keys(mastery).length > 0) localStorage.setItem("ib-math-mastery", JSON.stringify(mastery));
-  }, [mastery]);
-
-  useEffect(() => {
-    if (history.length > 0) localStorage.setItem("ib-math-history", JSON.stringify(history));
-  }, [history]);
 
   const getMasteryLevel = (topicTitle: string) => {
     const stats = mastery[topicTitle];
@@ -88,8 +87,10 @@ export default function MathWorkspace() {
     setFeedbackText("");
     setUserAnswer("");
     setShowSolution(false);
+    setShowHint(false);
     
     try {
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -101,9 +102,11 @@ export default function MathWorkspace() {
           id: data.id || Date.now().toString(),
           topic: topicToUse,
           text: data.question_text,
+          hint: data.hint || "No hint available.",
           answer: data.correct_answer,
           explanation: data.explanation || "",
         });
+
       } else {
         alert("Failed to generate question.");
       }
@@ -169,7 +172,62 @@ export default function MathWorkspace() {
     }
   };
 
+  const handleSurrender = async () => {
+    if (showSolution) return; // Already surrendered
+    
+    setShowSolution(true);
+    setChecking(true);
+    
+    try {
+      // Save as incorrect/surrendered attempt
+      await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: question.text,
+          correctAnswer: question.answer,
+          topic: question.topic,
+          userAnswer: userAnswer || "(Surrendered)",
+          questionId: question.id,
+          userId: userId,
+          forceIncorrect: true // Flag to mark as incorrect without AI grading
+        }),
+      });
+      
+      // Update local stats immediately for better UX
+      setMastery(prev => {
+        const currentStats = prev[question.topic] || { correct: 0, total: 0 };
+        return {
+          ...prev,
+          [question.topic]: {
+            total: currentStats.total + 1,
+            correct: currentStats.correct
+          }
+        };
+      });
+
+      // Add to local history
+      const newHistoryItem: HistoryItem = {
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        topic: question.topic,
+        questionText: question.text,
+        userAnswer: userAnswer || "(Surrendered)",
+        correctAnswer: question.answer,
+        explanation: question.explanation,
+        isCorrect: false,
+      };
+      setHistory(prev => [newHistoryItem, ...prev]);
+
+    } catch (err) {
+      console.error("Failed to save surrendered attempt:", err);
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const recommendTopic = () => {
+
     let worstTopic = "";
     let minScore = 101;
     const allSubtopics = IB_SL_AA_SYLLABUS.flatMap(t => t.subtopics);
@@ -352,27 +410,46 @@ export default function MathWorkspace() {
                     type="text"
                     value={userAnswer}
                     onChange={(e) => setUserAnswer(e.target.value)}
-                    placeholder="Enter value..."
-                    className="flex-1 p-4 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-mono text-lg transition-all"
-                    onKeyDown={(e) => e.key === "Enter" && checkAnswer()}
+                    disabled={showSolution} // Lock input if surrendered
+                    placeholder={showSolution ? "Input locked" : "Enter value..."}
+                    className="flex-1 p-4 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-mono text-lg transition-all disabled:bg-slate-50 disabled:text-slate-400"
+                    onKeyDown={(e) => e.key === "Enter" && !showSolution && checkAnswer()}
                   />
                   <button
                     onClick={checkAnswer}
-                    disabled={checking || !userAnswer}
+                    disabled={checking || !userAnswer || showSolution}
                     className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:scale-95 transition-all font-bold shadow-lg shadow-blue-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
                   >
                     {checking ? <Loader2 size={20} className="animate-spin" /> : "Check Answer"}
                   </button>
                 </div>
-                <div className="mt-4 flex justify-end">
+                
+                <div className="mt-4 flex justify-between items-center">
                   <button
-                    onClick={() => setShowSolution(!showSolution)}
-                    className="text-sm font-semibold text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1"
+                    onClick={() => setShowHint(!showHint)}
+                    className="text-sm font-semibold text-amber-600 hover:text-amber-700 transition-colors flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-amber-50"
                   >
-                    {showSolution ? "Hide Solution" : "Stuck? Show Solution"} <ChevronRight size={14} />
+                    <Sparkles size={14} /> {showHint ? "Hide Hint" : "Need a Hint?"}
+                  </button>
+
+                  <button
+                    onClick={handleSurrender}
+                    disabled={showSolution || checking}
+                    className="text-sm font-semibold text-slate-500 hover:text-red-600 transition-colors flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {showSolution ? "Solution Revealed" : "I Give Up, Show Solution"} <ChevronRight size={14} />
                   </button>
                 </div>
+
+                {/* Hint Display */}
+                {showHint && question.hint && (
+                  <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-800 text-sm animate-in fade-in slide-in-from-top-2">
+                    <p className="font-bold uppercase text-[10px] tracking-wider mb-1 opacity-70">Hint</p>
+                    <MathRenderer text={question.hint} />
+                  </div>
+                )}
               </div>
+
 
               {/* Feedback & Solution */}
               {(showSolution || feedback) && (

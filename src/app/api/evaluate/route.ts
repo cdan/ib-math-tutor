@@ -6,72 +6,99 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
 export async function POST(req: Request) {
   try {
-    const { question, userAnswer, topic, questionId, userId } = await req.json();
+    const { question, userAnswer, topic, questionId, userId, forceIncorrect } = await req.json();
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    let status = "incorrect";
+    let feedback = "";
+    let isCorrect = false;
 
-    const prompt = `
-      You are grading an IB Math AA SL answer.
-      Question: "${question}"
-      Student Answer: "${userAnswer}"
-      
-      Output format (STRICTLY follow this):
-      
-      [STATUS]
-      CORRECT or INCORRECT or PARTIAL
-      
-      [FEEDBACK]
-      Write your feedback here. Use LaTeX freely.
-    `;
+    if (forceIncorrect) {
+      status = "surrendered";
+      feedback = "Solution revealed.";
+    } else {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+      const prompt = `
+        You are grading an IB Math AA SL answer.
+        Question: "${question}"
+        Student Answer: "${userAnswer}"
+        
+        Output format (STRICTLY follow this):
+        
+        [STATUS]
+        CORRECT or INCORRECT or PARTIAL
+        
+        [FEEDBACK]
+        Write your feedback here. Use LaTeX freely.
+      `;
 
-    const statusMatch = text.match(/\[STATUS\]\s*(CORRECT|INCORRECT|PARTIAL)/i);
-    const feedbackMatch = text.match(/\[FEEDBACK\]([\s\S]*)/);
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
 
-    if (!statusMatch || !feedbackMatch) {
-      throw new Error("Failed to parse evaluation format");
+      const statusMatch = text.match(/\[STATUS\]\s*(CORRECT|INCORRECT|PARTIAL)/i);
+      const feedbackMatch = text.match(/\[FEEDBACK\]([\s\S]*)/);
+
+      if (!statusMatch || !feedbackMatch) {
+        throw new Error("Failed to parse evaluation format");
+      }
+
+      status = statusMatch[1].toLowerCase();
+      isCorrect = status === "correct";
+      feedback = feedbackMatch[1].trim();
     }
 
-    const status = statusMatch[1].toLowerCase();
-    const isCorrect = status === "correct";
-    const feedback = feedbackMatch[1].trim();
-
     // DB Operations (Fire and Forget)
-    console.log("Evaluate DB Attempt:", { userId, questionId }); // LOG THIS
+
+    console.log("Evaluate DB Attempt START:", { userId, questionId, isCorrect });
 
     if (userId && questionId && !questionId.startsWith("temp-")) {
-      const { error: attemptError } = await supabaseAdmin.from('attempts').insert({
+      const attemptPayload = {
         user_id: userId,
         question_id: questionId,
         user_answer: userAnswer,
         is_correct: isCorrect,
         feedback: feedback
-      });
+      };
+      
+      const { data: attemptData, error: attemptError } = await supabaseAdmin
+        .from('attempts')
+        .insert(attemptPayload)
+        .select();
 
-      if (attemptError) console.error("Attempt Insert Error:", attemptError);
+      if (attemptError) {
+        console.error("Attempt Insert Error:", attemptError);
+      } else {
+        console.log("Attempt Insert Success:", attemptData);
+      }
 
       // Update Mastery (Upsert)
-      // First, get current
-      const { data: current } = await supabaseAdmin
+      const { data: current, error: fetchError } = await supabaseAdmin
         .from('user_mastery')
         .select('*')
         .eq('user_id', userId)
         .eq('topic', topic)
         .single();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') { // Ignore "no rows" error
+          console.error("Mastery Fetch Error:", fetchError);
+      }
 
       const newCorrect = (current?.correct_count || 0) + (isCorrect ? 1 : 0);
       const newTotal = (current?.total_attempts || 0) + 1;
 
-      await supabaseAdmin.from('user_mastery').upsert({
+      const { error: upsertError } = await supabaseAdmin.from('user_mastery').upsert({
         user_id: userId,
         topic: topic,
         correct_count: newCorrect,
         total_attempts: newTotal,
         last_practiced_at: new Date().toISOString()
       });
+
+      if (upsertError) console.error("Mastery Upsert Error:", upsertError);
+    } else {
+        console.log("Skipping DB save: Invalid userId or temp questionId", { userId, questionId });
     }
+
 
     return NextResponse.json({
       status: status,

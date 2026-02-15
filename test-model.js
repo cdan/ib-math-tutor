@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 async function listModels() {
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "AIzaSyCBZVFNstM98uWvCxzI_GIWiyyuuRIPYhY");
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
   const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // Dummy model to init
 
   // There isn't a direct "listModels" on the client instance easily in the node SDK sometimes, 

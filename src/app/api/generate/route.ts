@@ -6,7 +6,7 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
 export async function POST(req: Request) {
   try {
-    const { topic } = await req.json();
+    const { topic, course = "IB" } = await req.json();
 
     // 1. Review Mechanism (10% chance)
     // Try to pick a question from history to reinforce learning
@@ -20,6 +20,7 @@ export async function POST(req: Request) {
         .from('questions')
         .select('*')
         .eq('topic', topic)
+        .eq('course', course) // Filter by course as well
         .limit(50);
 
       if (!fetchError && existingQuestions && existingQuestions.length > 0) {
@@ -40,10 +41,32 @@ export async function POST(req: Request) {
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const prompt = `
+    let systemInstruction = "";
+    if (course === "SAT") {
+      systemInstruction = `
+      Act as an expert SAT Tutor (Digital SAT format).
+      Generate a practice question for the topic: "${topic}".
+      
+      If the topic is related to MATH (Algebra, Data Analysis, etc.):
+      - Generate a standard multiple-choice or student-produced response question.
+      - Difficulty: Module 1 or 2 level.
+      
+      If the topic is related to READING & WRITING (Craft & Structure, Grammar, etc.):
+      - Generate a standard passage-based question (approx 50-150 words passage).
+      - Include the passage in the [QUESTION] block.
+      - Ensure it tests the specific skill (e.g., words in context, transitions, punctuation).
+      - Provide 4 distinct options (A, B, C, D) in the question text.
+      `;
+    } else {
+      systemInstruction = `
       Act as an expert IB Math AA SL teacher.
       Generate a standard exam-style practice question for: "${topic}".
       The difficulty should be appropriate for IB Math AA SL (Level 4-6).
+      `;
+    }
+
+    const prompt = `
+      ${systemInstruction}
       
       Output format (STRICTLY follow this, do not use JSON):
       
@@ -75,6 +98,7 @@ export async function POST(req: Request) {
 
     const questionData = {
       topic: topic,
+      course: course, // Save course info
       question_text: questionMatch[1].trim(),
       hint: hintMatch[1].trim(),
       correct_answer: answerMatch[1].trim(),

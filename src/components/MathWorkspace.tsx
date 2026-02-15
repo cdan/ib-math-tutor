@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { IB_SL_AA_SYLLABUS } from "@/data/syllabus";
+import { SAT_SYLLABUS } from "@/data/sat-syllabus";
 import { IB_FORMULAS } from "@/data/formulas";
 import { Send, RefreshCw, CheckCircle, XCircle, BookOpen, Loader2, Sparkles, Trophy, Book, History, ChevronRight, Calculator, TrendingUp } from "lucide-react";
 import MathRenderer from "@/components/MathRenderer";
+
 
 // Initial state
 const INITIAL_QUESTION = {
@@ -30,8 +32,9 @@ type HistoryItem = {
   isCorrect: boolean;
 };
 
-export default function MathWorkspace() {
+export default function MathWorkspace({ initialCourse = "IB" }: { initialCourse?: "IB" | "SAT" }) {
   const [selectedTopic, setSelectedTopic] = useState("");
+  const [course, setCourse] = useState(initialCourse); // "IB" or "SAT"
   const [question, setQuestion] = useState(INITIAL_QUESTION);
   const [userAnswer, setUserAnswer] = useState("");
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | "partial" | null>(null);
@@ -51,7 +54,7 @@ export default function MathWorkspace() {
     // Fetch initial data from API for the fixed user
     const fetchProgress = async () => {
       try {
-        const res = await fetch(`/api/user-progress?userId=${userId}`);
+        const res = await fetch(`/api/user-progress?userId=${userId}&course=${course}`);
         if (res.ok) {
           const data = await res.json();
           setMastery(data.mastery || {});
@@ -62,7 +65,7 @@ export default function MathWorkspace() {
       }
     };
     fetchProgress();
-  }, [userId]);
+  }, [userId, course]);
 
 
   const getMasteryBadge = (topicTitle: string) => {
@@ -98,7 +101,7 @@ export default function MathWorkspace() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: topicToUse }),
+        body: JSON.stringify({ topic: topicToUse, course }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -232,7 +235,9 @@ export default function MathWorkspace() {
 
   const recommendTopic = () => {
     let minScore = 101;
-    const allSubtopics = IB_SL_AA_SYLLABUS.flatMap(t => t.subtopics);
+    const currentSyllabus = course === "IB" ? IB_SL_AA_SYLLABUS : SAT_SYLLABUS;
+    // Extract subtopics correctly based on the syllabus structure
+    const allSubtopics = currentSyllabus.flatMap(t => t.subtopics || []);
     const candidateTopics: string[] = [];
 
     // 1. Calculate scores and find minimum
@@ -269,14 +274,15 @@ export default function MathWorkspace() {
   };
 
   const getParentTopic = (subTitle: string) => {
-    for (const topic of IB_SL_AA_SYLLABUS) {
-      if (topic.subtopics.some(s => s.title === subTitle)) return topic.title;
+    const currentSyllabus = course === "IB" ? IB_SL_AA_SYLLABUS : SAT_SYLLABUS;
+    for (const topic of currentSyllabus) {
+      if (topic.subtopics?.some(s => s.title === subTitle)) return topic.title;
     }
     return null;
   };
 
   const currentParentTopic = getParentTopic(selectedTopic || question.topic);
-  const relevantFormulas = currentParentTopic ? IB_FORMULAS[currentParentTopic] : [];
+  const relevantFormulas = (course === "IB" && currentParentTopic) ? IB_FORMULAS[currentParentTopic] : [];
 
   // Stats
   const stats = history.reduce((acc, item) => {
@@ -291,7 +297,9 @@ export default function MathWorkspace() {
 
   // Badge Counts
   const badgeCounts = { master: 0, pro: 0, novice: 0 };
-  IB_SL_AA_SYLLABUS.forEach(t => t.subtopics.forEach(sub => {
+  
+  // Calculate badges for BOTH syllabuses to show total progress
+  [...IB_SL_AA_SYLLABUS, ...SAT_SYLLABUS].forEach(t => t.subtopics?.forEach(sub => {
     const badge = getMasteryBadge(sub.title);
     if (badge.label === "Master") badgeCounts.master++;
     if (badge.label === "Pro") badgeCounts.pro++;
@@ -322,7 +330,6 @@ export default function MathWorkspace() {
 
   return (
     <div className="flex min-h-screen w-full bg-slate-50 justify-center font-sans">
-
       
       {/* Formula Slide-over */}
       {showFormulas && (
@@ -360,10 +367,17 @@ export default function MathWorkspace() {
         {/* Modern Header */}
         <header className="px-8 py-6 border-b border-slate-100 bg-white z-20 sticky top-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-lg shadow-blue-200">
-              <BookOpen size={24} strokeWidth={2.5} />
+            <Link href="/" className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-400 hover:text-slate-600">
+              <ChevronRight size={20} className="rotate-180" />
+            </Link>
+            
+            <div className={`p-2.5 rounded-xl text-white shadow-lg transition-colors ${course === "IB" ? "bg-blue-600 shadow-blue-200" : "bg-purple-600 shadow-purple-200"}`}>
+              {course === "IB" ? <BookOpen size={24} strokeWidth={2.5} /> : <Book size={24} strokeWidth={2.5} />}
             </div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">IB Math AA SL</h1>
+            
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+              {course === "IB" ? "IB Math AA SL" : "SAT Prep"}
+            </h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -384,8 +398,6 @@ export default function MathWorkspace() {
                 <div className="absolute -top-1 right-6 w-2 h-2 bg-slate-800 rotate-45"></div>
               </div>
             </div>
-
-
 
             <button 
               onClick={() => setShowFormulas(true)}
@@ -477,10 +489,10 @@ export default function MathWorkspace() {
             onChange={(e) => setSelectedTopic(e.target.value)}
             className="w-full sm:w-auto min-w-[300px] p-2.5 pl-4 pr-10 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow shadow-sm cursor-pointer hover:border-blue-300"
           >
-            <option value="">Select a Topic to Practice...</option>
-            {IB_SL_AA_SYLLABUS.map((topic) => (
+            <option value="">Select a {course} Topic...</option>
+            {(course === "IB" ? IB_SL_AA_SYLLABUS : SAT_SYLLABUS).map((topic) => (
               <optgroup key={topic.id} label={topic.title}>
-                {topic.subtopics.map((sub) => {
+                {topic.subtopics?.map((sub) => {
                   const badge = getMasteryBadge(sub.title);
                   return (
                     <option key={sub.id} value={sub.title}>
@@ -604,12 +616,12 @@ export default function MathWorkspace() {
               <h2 className="text-2xl font-bold text-slate-800 mb-2">Ready to Practice?</h2>
               <p className="text-slate-500 max-w-md mb-8">Select a topic from the dropdown or use Smart Pick to target your weak spots.</p>
               <button
-                onClick={recommendTopic}
+                onClick={() => selectedTopic ? generateQuestion() : recommendTopic()}
                 disabled={loading}
                 className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-200/50 transition-all font-bold flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                {loading ? "Generating..." : "Start Smart Session"}
+                {loading ? "Generating..." : (selectedTopic ? "Start Selected Topic" : "Start Smart Session")}
               </button>
             </div>
           )}

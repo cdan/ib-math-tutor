@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "IB Math AA Tutor",
+  title: "Rachel's Home Teacher",
   description: "Personalized Math Learning App",
 };
 

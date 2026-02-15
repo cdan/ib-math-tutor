@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, CheckCircle, XCircle, ChevronDown, ChevronUp, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, ChevronDown, ChevronUp, Calendar, ChevronLeft, ChevronRight, BookOpen, Book } from "lucide-react";
 import Link from "next/link";
 import MathRenderer from "@/components/MathRenderer";
 
@@ -22,19 +22,22 @@ export default function HistoryPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(0); // 0 = current view, 1 = previous
+  const [course, setCourse] = useState("IB"); // "IB" or "SAT"
   const userId = "student"; 
 
   useEffect(() => {
     const fetchHistory = async () => {
-
+      setLoading(true);
       try {
-        const res = await fetch(`/api/user-progress?userId=${userId}`);
+        const res = await fetch(`/api/user-progress?userId=${userId}&course=${course}`);
         if (res.ok) {
           const data = await res.json();
           setHistory(data.history || []);
-          // Default to today
-          const today = new Date().toISOString().split("T")[0];
-          setSelectedDate(today);
+          // Default to today if not set, or keep existing
+          if (!selectedDate) {
+            const today = new Date().toISOString().split("T")[0];
+            setSelectedDate(today);
+          }
         }
       } catch (err) {
         console.error("Failed to load history:", err);
@@ -43,7 +46,7 @@ export default function HistoryPage() {
       }
     };
     fetchHistory();
-  }, []);
+  }, [course, userId]); // Re-fetch when course changes
 
   // Process data for heatmap
   const getDailyCounts = () => {
@@ -60,9 +63,15 @@ export default function HistoryPage() {
   // Generate calendar days (Last 35 days based on page)
   const getCalendarDays = () => {
     const days = [];
+    // Start from today, go back based on page
     const endDate = new Date();
+    // Reset time to avoid timezone issues affecting date calc
+    endDate.setHours(12, 0, 0, 0); 
+    
+    // Shift by page * 35 days
     endDate.setDate(endDate.getDate() - (page * 35));
 
+    // Generate 35 days (5 weeks)
     for (let i = 34; i >= 0; i--) {
       const d = new Date(endDate);
       d.setDate(d.getDate() - i);
@@ -82,10 +91,10 @@ export default function HistoryPage() {
 
 
   const getColor = (count: number) => {
-    if (count === 0) return "bg-gray-100 border-gray-200";
-    if (count < 2) return "bg-red-200 border-red-300 text-red-800";
-    if (count <= 5) return "bg-yellow-200 border-yellow-300 text-yellow-800";
-    return "bg-green-300 border-green-400 text-green-800";
+    if (count === 0) return "bg-gray-50 border-gray-100 text-gray-300";
+    if (count < 2) return course === "IB" ? "bg-blue-100 border-blue-200 text-blue-600" : "bg-purple-100 border-purple-200 text-purple-600";
+    if (count <= 5) return course === "IB" ? "bg-blue-300 border-blue-400 text-blue-800" : "bg-purple-300 border-purple-400 text-purple-800";
+    return course === "IB" ? "bg-blue-500 border-blue-600 text-white" : "bg-purple-500 border-purple-600 text-white";
   };
 
   const filteredHistory = selectedDate 
@@ -101,13 +110,40 @@ export default function HistoryPage() {
       <div className="w-full max-w-4xl flex flex-col gap-6">
         
         {/* Header */}
-        <div className="flex items-center gap-4 mb-2">
-          <Link href="/" className="p-3 hover:bg-white rounded-full text-slate-500 shadow-sm border border-transparent hover:border-slate-200 transition-all">
-            <ArrowLeft size={20} />
-          </Link>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Calendar className="text-blue-600" /> Activity Log
-          </h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="p-3 hover:bg-white rounded-full text-slate-500 shadow-sm border border-transparent hover:border-slate-200 transition-all">
+              <ArrowLeft size={20} />
+            </Link>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Calendar className={course === "IB" ? "text-blue-600" : "text-purple-600"} /> 
+              Activity Log
+            </h1>
+          </div>
+
+          {/* Course Toggle */}
+          <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200 self-start sm:self-auto">
+            <button
+              onClick={() => setCourse("IB")}
+              className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
+                course === "IB" 
+                  ? "bg-blue-50 text-blue-600 shadow-sm" 
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              <BookOpen size={16} /> IB Math
+            </button>
+            <button
+              onClick={() => setCourse("SAT")}
+              className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
+                course === "SAT" 
+                  ? "bg-purple-50 text-purple-600 shadow-sm" 
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              <Book size={16} /> SAT Prep
+            </button>
+          </div>
         </div>
 
         {/* Heatmap Card */}
@@ -132,6 +168,7 @@ export default function HistoryPage() {
               </button>
             </div>
           </div>
+          
           <div className="grid grid-cols-7 gap-2 sm:gap-3">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
               <div key={d} className="text-center text-[10px] font-bold text-slate-300 uppercase">{d}</div>
@@ -139,6 +176,7 @@ export default function HistoryPage() {
             {calendarDays.map((dateStr) => {
               const count = dailyCounts[dateStr] || 0;
               const dateObj = new Date(dateStr);
+              // Simple check if date is valid (some edge cases in date math might produce weird dates if not careful, but ISO string usually ok)
               const isToday = dateStr === new Date().toISOString().split("T")[0];
               const isSelected = selectedDate === dateStr;
 
@@ -146,44 +184,53 @@ export default function HistoryPage() {
                 <button
                   key={dateStr}
                   onClick={() => setSelectedDate(dateStr)}
-                  className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all relative group
+                  className={`aspect-square rounded-lg border flex flex-col items-center justify-center transition-all relative group
                     ${getColor(count)}
-                    ${isSelected ? "ring-2 ring-blue-500 ring-offset-2 z-10 scale-105" : "hover:scale-105"}
+                    ${isSelected 
+                      ? (course === "IB" ? "ring-2 ring-blue-500 ring-offset-2 z-10 scale-105" : "ring-2 ring-purple-500 ring-offset-2 z-10 scale-105") 
+                      : "hover:scale-105 hover:border-slate-300"}
                   `}
                 >
                   <span className={`text-xs font-bold ${count === 0 ? "text-slate-300" : ""}`}>{dateObj.getDate()}</span>
-                  {count > 0 && <span className="text-[10px] font-medium opacity-80">{count}</span>}
-                  {isToday && <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full border border-white" />}
+                  {/* {count > 0 && <span className="text-[10px] font-medium opacity-80">{count}</span>} */}
+                  {isToday && <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white ${course === "IB" ? "bg-blue-500" : "bg-purple-500"}`} />}
                   
                   {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:block bg-slate-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-20 shadow-lg">
-                    {dateStr}: {count} questions
-                  </div>
+                  {count > 0 && (
+                    <div className="absolute bottom-full mb-2 hidden group-hover:block bg-slate-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-20 shadow-lg pointer-events-none">
+                      {dateObj.toLocaleDateString()}: {count} Qs
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
           
           <div className="flex justify-end items-center gap-4 mt-4 text-[10px] text-slate-400 font-medium">
-            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded"></div> 0</div>
-            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-200 border border-red-300 rounded"></div> 1</div>
-            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-200 border border-yellow-300 rounded"></div> 2-5</div>
-            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-300 border border-green-400 rounded"></div> &gt;5</div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-50 border border-gray-100 rounded"></div> 0</div>
+            <div className="flex items-center gap-1"><div className={`w-3 h-3 rounded border ${course === "IB" ? "bg-blue-100 border-blue-200" : "bg-purple-100 border-purple-200"}`}></div> 1</div>
+            <div className="flex items-center gap-1"><div className={`w-3 h-3 rounded border ${course === "IB" ? "bg-blue-300 border-blue-400" : "bg-purple-300 border-purple-400"}`}></div> 2-5</div>
+            <div className="flex items-center gap-1"><div className={`w-3 h-3 rounded border ${course === "IB" ? "bg-blue-500 border-blue-600" : "bg-purple-500 border-purple-600"}`}></div> &gt;5</div>
           </div>
         </div>
 
         {/* Selected Day List */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col min-h-[400px]">
-          <div className="p-6 border-b border-slate-100 bg-white">
-            <h3 className="text-lg font-bold text-slate-800">
-              {selectedDate ? new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : "Select a date"}
-            </h3>
-            <p className="text-sm text-slate-500">{filteredHistory.length} questions practiced</p>
+          <div className="p-6 border-b border-slate-100 bg-white flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">
+                {selectedDate ? new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : "Select a date"}
+              </h3>
+              <p className="text-sm text-slate-500">{filteredHistory.length} questions practiced</p>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
             {loading ? (
-               <div className="text-center py-20 text-slate-400 animate-pulse">Loading history...</div>
+               <div className="text-center py-20 text-slate-400 animate-pulse flex flex-col items-center gap-3">
+                 <Loader2 className="animate-spin" />
+                 Loading history...
+               </div>
             ) : filteredHistory.length === 0 ? (
               <div className="text-center py-20 text-slate-400">
                 <p>No activity recorded for this day.</p>
@@ -207,7 +254,7 @@ export default function HistoryPage() {
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-baseline mb-1">
-                        <h3 className="text-sm font-bold text-indigo-700 truncate">{item.topic}</h3>
+                        <h3 className={`text-sm font-bold truncate ${course === "IB" ? "text-blue-700" : "text-purple-700"}`}>{item.topic}</h3>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 ml-2">
                           {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </span>
@@ -260,5 +307,24 @@ export default function HistoryPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function Loader2({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={className} 
+      xmlns="http://www.w3.org/2000/svg" 
+      width="24" 
+      height="24" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   );
 }
